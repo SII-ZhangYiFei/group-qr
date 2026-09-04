@@ -115,7 +115,8 @@
       'use strict';
 
       const RAW_SOURCE = 'https://raw.githubusercontent.com/SII-ZhangYiFei/group-qr/main/group.png';
-      const sources = ['./group.png', RAW_SOURCE];
+      // main 分支的 raw 文件是最新来源；Pages 同源副本只作为网络回退。
+      const sources = [RAW_SOURCE, './group.png'];
       const status = document.querySelector('#status');
       const actions = document.querySelector('#actions');
       const retry = document.querySelector('#retry');

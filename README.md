@@ -16,6 +16,6 @@
 
 ## 更新方式
 
-`group.png` 由自动化流程每周更新。更新完成后，GitHub Pages 通常需要几十秒到几分钟刷新；`persistent-group-qr.png` 和 `index.html` 不需要修改。
+`group.png` 由自动化流程每周更新。入口页会优先读取 `main` 分支的最新图片；`persistent-group-qr.png`、Pages 分支和 `index.html` 都不需要跟着修改。GitHub 图片缓存偶尔需要几十秒到几分钟刷新。
 
 中转页内置 ZXing 解析器，不向第三方解码服务上传图片，并且只允许跳转到 `https://weixin.qq.com/g/`。
