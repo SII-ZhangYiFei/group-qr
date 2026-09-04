@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1713">
+  <meta name="robots" content="noindex, nofollow">
+  <title>正在打开微信群</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #07100d;
+      color: #f4fbf7;
+    }
+    * { box-sizing: border-box; }
+    body {
+      min-height: 100svh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at 20% 15%, rgba(46, 229, 139, .16), transparent 34rem),
+        radial-gradient(circle at 90% 90%, rgba(41, 181, 232, .09), transparent 32rem),
+        #07100d;
+    }
+    main {
+      width: min(100%, 430px);
+      padding: 32px;
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: 24px;
+      background: rgba(13, 29, 23, .82);
+      box-shadow: 0 22px 70px rgba(0,0,0,.35);
+      text-align: center;
+      backdrop-filter: blur(16px);
+    }
+    .mark {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 22px;
+      display: grid;
+      place-items: center;
+      border-radius: 20px;
+      color: #07100d;
+      background: #35e895;
+      box-shadow: 0 12px 32px rgba(53,232,149,.28);
+    }
+    .mark svg { width: 34px; height: 34px; }
+    h1 { margin: 0; font-size: 26px; letter-spacing: -.03em; }
+    p { margin: 12px 0 0; color: #a9bbb2; line-height: 1.65; }
+    .status {
+      min-height: 48px;
+      margin-top: 22px;
+      display: grid;
+      place-items: center;
+      color: #d9eee3;
+      font-size: 15px;
+    }
+    .loader {
+      width: 24px;
+      height: 24px;
+      margin-right: 10px;
+      display: inline-block;
+      vertical-align: -6px;
+      border: 2px solid rgba(255,255,255,.18);
+      border-top-color: #35e895;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .actions { display: none; gap: 10px; margin-top: 18px; }
+    .actions.visible { display: grid; }
+    button, a.button {
+      appearance: none;
+      width: 100%;
+      padding: 13px 16px;
+      border: 0;
+      border-radius: 13px;
+      font: inherit;
+      font-weight: 650;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    button { color: #07100d; background: #35e895; }
+    a.button { color: #d9eee3; background: rgba(255,255,255,.08); }
+    .detail { margin-top: 22px; font-size: 12px; color: #6f8278; }
+    canvas { display: none; }
+    @media (prefers-reduced-motion: reduce) { .loader { animation: none; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 5.5h7a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3H8l-3.5 2 .8-2.3A3 3 0 0 1 4 10.7z"/>
+        <path d="M12 10.5h5a3 3 0 0 1 3 3v1.2a3 3 0 0 1-1.3 2.5l.8 2.3-3.5-2h-4a3 3 0 0 1-3-3v-1"/>
+      </svg>
+    </div>
+    <h1>正在打开微信群</h1>
+    <p>正在读取最新群二维码，完成后会自动跳转。</p>
+    <div id="status" class="status" role="status" aria-live="polite">
+      <span><i class="loader"></i>获取最新二维码…</span>
+    </div>
+    <div id="actions" class="actions">
+      <button id="retry" type="button">重新尝试</button>
+      <a id="source" class="button" href="./group.png" target="_blank" rel="noopener">查看最新原码</a>
+    </div>
+    <div class="detail">群二维码更新后，无需更换此入口码</div>
+  </main>
+  <canvas id="canvas" aria-hidden="true"></canvas>
+  <script src="./vendor/zxing.min.js"></script>
+  <script>
+    (() => {
+      'use strict';
+
+      const RAW_SOURCE = 'https://raw.githubusercontent.com/SII-ZhangYiFei/group-qr/main/group.png';
+      const sources = ['./group.png', RAW_SOURCE];
+      const status = document.querySelector('#status');
+      const actions = document.querySelector('#actions');
+      const retry = document.querySelector('#retry');
+      const canvas = document.querySelector('#canvas');
+
+      function setStatus(message, loading = false) {
+        status.innerHTML = loading
+          ? `<span><i class="loader"></i>${message}</span>`
+          : `<span>${message}</span>`;
+      }
+
+      function loadBlobAsImage(blob) {
+        return new Promise((resolve, reject) => {
+          const url = URL.createObjectURL(blob);
+          const image = new Image();
+          image.onload = () => { URL.revokeObjectURL(url); resolve(image); };
+          image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片无法打开')); };
+          image.src = url;
+        });
+      }
+
+      async function fetchLatestImage() {
+        let lastError;
+        for (const source of sources) {
+          try {
+            const separator = source.includes('?') ? '&' : '?';
+            const response = await fetch(`${source}${separator}v=${Date.now()}`, {
+              cache: 'no-store',
+              credentials: 'omit'
+            });
+            if (!response.ok) throw new Error(`图片请求失败（${response.status}）`);
+            return await response.blob();
+          } catch (error) {
+            lastError = error;
+          }
+        }
+        throw lastError || new Error('无法获取二维码图片');
+      }
+
+      function decode(image) {
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+        context.drawImage(image, 0, 0);
+        const rgba = context.getImageData(0, 0, canvas.width, canvas.height).data;
+        const luminance = new Uint8ClampedArray(canvas.width * canvas.height);
+
+        for (let source = 0, target = 0; source < rgba.length; source += 4, target += 1) {
+          luminance[target] = (rgba[source] + 2 * rgba[source + 1] + rgba[source + 2]) >> 2;
+        }
+
+        const luminanceSource = new ZXing.RGBLuminanceSource(luminance, canvas.width, canvas.height);
+        const bitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminanceSource));
+        const hints = new Map();
+        hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.QR_CODE]);
+        return new ZXing.QRCodeReader().decode(bitmap, hints).getText();
+      }
+
+      function validate(payload) {
+        const target = new URL(payload);
+        if (target.protocol !== 'https:' || target.hostname !== 'weixin.qq.com' || !target.pathname.startsWith('/g/')) {
+          throw new Error('最新图片不是有效的微信群二维码');
+        }
+        return target.href;
+      }
+
+      async function start() {
+        actions.classList.remove('visible');
+        retry.disabled = true;
+        setStatus('获取最新二维码…', true);
+        try {
+          const blob = await fetchLatestImage();
+          setStatus('识别最新群链接…', true);
+          const image = await loadBlobAsImage(blob);
+          const target = validate(decode(image));
+          setStatus('识别成功，正在跳转…', true);
+          window.location.replace(target);
+        } catch (error) {
+          console.error(error);
+          setStatus('暂时无法识别最新二维码，请稍后重试。');
+          retry.disabled = false;
+          actions.classList.add('visible');
+        }
+      }
+
+      retry.addEventListener('click', start);
+      start();
+    })();
+  </script>
+</body>
+</html>
